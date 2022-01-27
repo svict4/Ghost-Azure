@@ -1,5 +1,5 @@
-﻿{
-  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.2",
   "parameters": {
     "siteName": {
@@ -8,19 +8,14 @@
     "hostingPlanName": {
       "type": "string"
     },
-    "siteLocation": {
-      "type": "string"
-    },
     "sku": {
       "type": "string",
       "allowedValues": [
-        "Free",
-        "Shared",
         "Basic",
         "Standard",
         "Premium"
       ],
-      "defaultValue": "Free"
+      "defaultValue": "Basic"
     },
     "Worker Size": {
       "type": "string",
@@ -58,10 +53,12 @@
       "defaultValue": ""
     },
     "repoUrl": {
-      "type": "string"
+      "type": "string",
+      "defaultValue": "https://github.com/<<PutYourGitHubUserHere>>/Ghost-Azure"
     },
     "branch": {
-      "type": "string"
+      "type": "string",
+      "defaultValue": "master"
     }
   },
   "variables": {
@@ -73,8 +70,8 @@
     {
       "name": "[parameters('hostingPlanName')]",
       "type": "Microsoft.Web/serverfarms",
-      "location": "[parameters('siteLocation')]",
-      "apiVersion": "2016-09-01",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2018-02-01",
       "sku": {
         "name": "[variables('sku')]"
       },
@@ -87,8 +84,8 @@
     {
       "name": "[parameters('siteName')]",
       "type": "Microsoft.Web/sites",
-      "location": "[parameters('siteLocation')]",
-      "apiVersion": "2016-08-01",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2018-11-01",
       "dependsOn": [
         "[resourceId('Microsoft.Web/serverfarms', parameters('hostingPlanName'))]"
       ],
@@ -102,9 +99,22 @@
       },
       "resources": [
         {
+          "apiVersion": "2018-11-01",
+          "name": "web",
+          "type": "config",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites', parameters('siteName'))]"
+          ],
+          "properties": {
+            "use32BitWorkerProcess": false,
+            "httpsOnly": true,
+            "alwaysOn": true
+          }
+        },
+        {
           "name": "appsettings",
           "type": "config",
-          "apiVersion": "2016-08-01",
+          "apiVersion": "2018-11-01",
           "dependsOn": [
             "[resourceId('Microsoft.Web/sites', parameters('siteName'))]",
             "[resourceId('Microsoft.Insights/components', variables('appInsightsName'))]"
@@ -116,15 +126,15 @@
             "mail__options__auth__user": "[parameters('Email Username')]",
             "mail__options__auth__pass": "[parameters('Email Password')]",
             "mail__from": "[parameters('Email From Address')]",
-            "WEBSITE_NODE_DEFAULT_VERSION": "~12",
-            "SCM_COMMAND_IDLE_TIMEOUT": "300",
+            "WEBSITE_NODE_DEFAULT_VERSION": "~14",
+            "NODE_ENV": "production",
             "APPINSIGHTS_INSTRUMENTATION_KEY": "[reference(concat('Microsoft.Insights/components/', variables('appInsightsName'))).InstrumentationKey]"
           }
         },
         {
           "name": "web",
           "type": "sourcecontrols",
-          "apiVersion": "2016-08-01",
+          "apiVersion": "2018-11-01",
           "dependsOn": [
             "[resourceId('Microsoft.Web/sites', parameters('siteName'))]",
             "[resourceId('Microsoft.Web/sites/config', parameters('siteName'), 'appsettings')]"
@@ -141,7 +151,7 @@
     {
       "name": "[variables('appInsightsName')]",
       "type": "Microsoft.Insights/components",
-      "location": "[parameters('siteLocation')]",
+      "location": "[resourceGroup().location]",
       "apiVersion": "2014-04-01",
       "condition": "[parameters('Deploy App Insights')]",
       "dependsOn": [
